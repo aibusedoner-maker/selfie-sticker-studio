@@ -6,6 +6,7 @@
 <title>Selfie Sticker Studio</title>
 <meta name="description" content="One selfie in, eight stickers that actually look like you out.">
 <meta name="theme-color" content="#f4f1ff">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%279%27 fill=%27%23ff5a36%27/%3E%3Ctext x=%2716%27 y=%2723%27 font-size=%2720%27 text-anchor=%27middle%27 fill=%27white%27%3E%E2%98%BA%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@500&display=swap">
@@ -404,7 +405,7 @@ function stickerPrompt(style, ex){
     "IDENTITY: keep the exact same person: face shape, eyes, eyebrows, nose, mouth, skin tone, hairstyle and hair colour, facial hair, glasses and any distinctive marks. The person must be instantly recognisable to their friends.",
     `EXPRESSION: ${ex.p}.`,
     `STYLE: ${STYLES[style]}.`,
-    "FRAMING: head and top of the shoulders only, centred, the whole head visible with a little margin on every side. One person only. No text, no letters, no logos, no frame, no border, no watermark.",
+    "FRAMING: head and top of the shoulders only, centred and slightly zoomed out, so there is clear green space between the hair and the left, right and top edges of the image. One person only. No text, no letters, no logos, no frame, no border, no watermark.",
     "BACKGROUND: a perfectly flat, uniform, pure green chroma-key background (#00FF00) filling the entire image edge to edge. No shadows on the background, no gradient, no floor, no scenery. Do not use green anywhere on the person."
   ].join("\n");
 }
@@ -415,16 +416,19 @@ async function toSticker(b64, mime){
   const W=img.width, H=img.height;
   const c=document.createElement("canvas"); c.width=W; c.height=H; const ctx=c.getContext("2d",{willReadFrequently:true});
   ctx.drawImage(img,0,0); const id=ctx.getImageData(0,0,W,H), d=id.data;
-  // estimate key colour from the border
+  // estimate key colour from the top edge and upper sides: hair and shoulders often touch the bottom and sides
   const border=[]; const step=Math.max(1,Math.floor((W+H)/400));
-  for(let x=0;x<W;x+=step){ border.push(px(x,0)); border.push(px(x,H-1)); }
-  for(let y=0;y<H;y+=step){ border.push(px(0,y)); border.push(px(W-1,y)); }
+  for(let x=0;x<W;x+=step){ border.push(px(x,0)); }
+  for(let y=0;y<H*0.6;y+=step){ border.push(px(0,y|0)); border.push(px(W-1,y|0)); }
   function px(x,y){ const i=(y*W+x)*4; return [d[i],d[i+1],d[i+2]]; }
-  const med = k => border.map(p=>p[k]).sort((a,b)=>a-b)[border.length>>1];
+  // keep only clearly green samples so hair at the edge does not skew the key
+  const greens = border.filter(p=>p[1]>120 && p[1]>p[0]*1.3 && p[1]>p[2]*1.3);
+  const samples = greens.length >= border.length*0.3 ? greens : border;
+  const med = k => samples.map(p=>p[k]).sort((a,b)=>a-b)[samples.length>>1];
   const key=[med(0),med(1),med(2)];
   const dist=(i)=>{ const r=d[i]-key[0], g=d[i+1]-key[1], b=d[i+2]-key[2]; return Math.sqrt(r*r+g*g+b*b); };
   const nearKey = border.filter(p=>Math.hypot(p[0]-key[0],p[1]-key[1],p[2]-key[2])<70).length/border.length;
-  let bgOk = nearKey>0.75;
+  let bgOk = nearKey>0.4 && key[1]>key[0]*1.3 && key[1]>key[2]*1.3;
   const alpha=new Uint8Array(W*H).fill(255);
   if(bgOk){
     const T=95, seen=new Uint8Array(W*H), q=new Int32Array(W*H); let qh=0, qt=0;
@@ -439,6 +443,11 @@ async function toSticker(b64, mime){
         const mx=Math.max(d[i],d[i+2]); if(d[i+1]>mx) d[i+1]=mx;
       }
     }
+    // the prompt forbids green on the person, so clear green pockets trapped in hair and despill green fringes everywhere
+    for(let p=0;p<W*H;p++){ if(!alpha[p]) continue; const i=p*4, r=d[i], g=d[i+1], b=d[i+2], mx=Math.max(r,b);
+      if(g>90 && g>mx*1.6){ alpha[p]=0; continue; }
+      if(g>mx*1.25){ alpha[p]=Math.min(alpha[p], Math.max(0, Math.round(255*(1-(g/mx-1.25)/0.35)))); }
+      if(g>mx) d[i+1]=mx; }
     const removed = alpha.reduce((a,v)=>a+(v===0),0)/(W*H);
     if(removed<0.15 || removed>0.92) bgOk=false;
   }
