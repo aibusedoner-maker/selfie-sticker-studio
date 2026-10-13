@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Selfie Sticker Studio</title>
+<meta name="description" content="One selfie in, eight stickers that actually look like you out.">
+<meta name="theme-color" content="#f4f1ff">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+[hidden]{display:none!important}
+/* Layout: one phone-width column of steps (key → selfie → style → pack); a collapsible Lab drawer holds evaluation data. */
+:root{
+  --bg:#f4f1ff; --surface:#ffffff; --sunk:#e9e4fb; --line:#d9d2f3;
+  --ink:#221f35; --ink-2:#575171; --ink-3:#8a84a3;
+  --accent:#ff5a36; --accent-ink:#ffffff; --accent-soft:#ffe3db;
+  --sun:#ffc93c; --mint:#2fbf8f; --mint-soft:#d7f5ea; --warn:#b4541a; --bad:#c43c3c; --bad-soft:#fbe1e1;
+  --checker:#ece8fb;
+  --f-display:"Fredoka",ui-rounded,system-ui,sans-serif;
+  --f-body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:18px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#15131f; --surface:#1f1c2d; --sunk:#29253b; --line:#38334f;
+  --ink:#f1eefb; --ink-2:#bdb6d6; --ink-3:#8c86a6;
+  --accent:#ff7452; --accent-ink:#1a0f0b; --accent-soft:#40231c;
+  --mint:#52d6a8; --mint-soft:#163a2f; --bad:#ff8c8c; --bad-soft:#3d1e22; --checker:#2a2639; color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:18px 80px;display:grid;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font:700 22px/1 var(--f-display);letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.logo b{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--accent);color:var(--accent-ink);transform:rotate(-8deg);box-shadow:0 0 0 3px var(--surface),0 2px 0 3px var(--line)}
+.hdr-actions{display:flex;gap:6px}
+.ghost{appearance:none;background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:500 13px var(--f-body);cursor:pointer}
+.ghost:hover{background:var(--sunk)}
+h1{font:700 clamp(30px,8vw,40px)/1.05 var(--f-display);margin:6px 0 0;letter-spacing:-.015em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.lede{color:var(--ink-2);margin:8px 0 0;max-width:42ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:14px}
+.step{display:flex;align-items:baseline;gap:10px}
+.step .n{font:600 13px var(--f-display);color:var(--accent-ink);background:var(--accent);border-radius:999px;min-width:24px;height:24px;display:inline-grid;place-items:center}
+.step h2{font:600 20px/1.2 var(--f-display);margin:0}
+.muted{color:var(--ink-3);font-size:14px}
+.small{font-size:13px}
+label.lbl{font-size:13px;font-weight:700;color:var(--ink-2);display:block;margin-bottom:6px}
+input[type=text],input[type=password],input[type=number],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;width:100%}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row > *{min-width:0}
+.btn{appearance:none;border:0;border-radius:14px;padding:13px 18px;font:600 16px var(--f-display);cursor:pointer;background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 color-mix(in srgb,var(--accent) 60%,#000)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 color-mix(in srgb,var(--accent) 60%,#000)}
+.btn.secondary{background:var(--sunk);color:var(--ink);box-shadow:0 3px 0 var(--line)}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none}
+button:focus-visible,input:focus-visible,select:focus-visible,.style-opt:focus-within,a:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink-2)}
+.privacy{display:flex;gap:10px;align-items:flex-start;background:var(--mint-soft);border-radius:12px;padding:10px 12px;font-size:13.5px;color:var(--ink)}
+.privacy svg{flex:none;margin-top:2px}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:10px 12px;font-size:14px}
+/* selfie */
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:20px;text-align:center;display:grid;gap:10px;justify-items:center;cursor:pointer;background:var(--bg)}
+.drop:hover{border-color:var(--accent)}
+.selfie-prev{display:flex;gap:14px;align-items:center}
+.selfie-prev img{width:92px;height:92px;object-fit:cover;border-radius:22px;border:4px solid var(--surface);box-shadow:0 0 0 1px var(--line);transform:rotate(-3deg)}
+.tips{margin:0;padding-left:18px;color:var(--ink-2);font-size:14px}
+/* styles */
+.styles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.style-opt{position:relative;border:2px solid var(--line);border-radius:16px;padding:12px 10px;background:var(--bg);cursor:pointer;display:grid;gap:6px;text-align:center}
+.style-opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.style-opt .sw{height:54px;border-radius:12px;display:grid;place-items:center;font:700 22px var(--f-display)}
+.style-opt strong{font:600 15px/1.2 var(--f-display)}
+.style-opt span{font-size:12px;color:var(--ink-3);line-height:1.3}
+.style-opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.sw-real{background:linear-gradient(135deg,#d9c3ae,#a8826a);color:#fff}
+.sw-3d{background:linear-gradient(135deg,#7cc6ff,#8b7bff);color:#fff}
+.sw-vinyl{background:linear-gradient(135deg,#ffd34d,#ff7aa8);color:#fff}
+/* pack */
+.timer{font:500 13px var(--f-mono);color:var(--ink-2)}
+.pack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{position:relative;border-radius:16px;background:var(--checker);background-image:linear-gradient(45deg,var(--sunk) 25%,transparent 25%,transparent 75%,var(--sunk) 75%),linear-gradient(45deg,var(--sunk) 25%,transparent 25%,transparent 75%,var(--sunk) 75%);background-size:16px 16px;background-position:0 0,8px 8px;aspect-ratio:1;display:grid;place-items:center;overflow:hidden}
+.tile img{width:100%;height:100%;object-fit:contain;-webkit-touch-callout:default}
+.tile .lab{position:absolute;left:8px;top:8px;background:var(--surface);border-radius:999px;padding:2px 9px;font:600 12px var(--f-display);color:var(--ink-2)}
+.tile .score{position:absolute;right:8px;top:8px;background:var(--ink);color:var(--bg);border-radius:999px;padding:2px 8px;font:500 11px var(--f-mono)}
+.tile .acts{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:6px;padding:8px}
+.tile .acts button{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;min-width:38px;height:34px;font-size:15px;cursor:pointer;padding:0 10px}
+.tile .acts button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tile.loading::after{content:"";width:46px;height:46px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite}
+.tile.failed{background:var(--bad-soft)}
+.tile .ferr{padding:12px;text-align:center;font-size:12.5px;color:var(--bad);display:grid;gap:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{0%{transform:scale(.6) rotate(-6deg);opacity:0}70%{transform:scale(1.05) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+.tile img.pop{animation:pop .45s cubic-bezier(.2,.9,.3,1.3)}
+@media (prefers-reduced-motion:reduce){.tile img.pop{animation:none}.tile.loading::after{animation:none}}
+.guide{margin:0;padding-left:20px;display:grid;gap:6px;font-size:15px}
+.fake{border:2px dashed var(--accent);background:var(--accent-soft);border-radius:var(--r);padding:16px;display:grid;gap:10px;text-align:center}
+.fake strong{font:600 18px var(--f-display)}
+/* lab */
+details.lab{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 18px}
+details.lab > summary{cursor:pointer;padding:14px 0;font:600 16px var(--f-display);list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.lab > summary::after{content:"＋";color:var(--ink-3)}
+details.lab[open] > summary::after{content:"－"}
+.lab-body{display:grid;gap:14px;padding-bottom:18px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stat{background:var(--bg);border-radius:12px;padding:10px 12px}
+.stat .k{font-size:12px;color:var(--ink-3)}
+.stat .v{font:500 18px var(--f-mono);font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--ink-3);font-weight:500}
+.note-cell{white-space:normal;min-width:180px;color:var(--ink-2)}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(20,16,35,.5);display:grid;place-items:center;padding:16px;z-index:10}
+.modal .card{max-width:380px;text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+footer{color:var(--ink-3);font-size:12.5px;text-align:center}
+footer a{color:inherit}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><b>☺</b><span>Sticker Studio</span></div>
+    <div class="hdr-actions">
+      <button class="ghost" id="langBtn" type="button">TR</button>
+      <button class="ghost" id="keyBtn" type="button" data-i18n="keyBtn">API key</button>
+    </div>
+  </header>
+
+  <section>
+    <h1 data-i18n-html="hero">One selfie. <em>Eight stickers</em> that actually look like you.</h1>
+    <p class="lede" data-i18n="lede">As expressive as an avatar, as real as your photo. Made for the group chat.</p>
+  </section>
+
+  <!-- KEY -->
+  <section class="card" id="keyCard" hidden>
+    <div class="step"><span class="n">0</span><h2 data-i18n="keyTitle">Connect Gemini</h2></div>
+    <p class="muted" data-i18n="keyHelp">This prototype runs in your browser with your own Gemini API key. The key stays on this device and is sent only to Google.</p>
+    <div>
+      <label class="lbl" for="apiKey" data-i18n="keyLabel">Gemini API key</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="AIza…">
+    </div>
+    <label class="check"><input type="checkbox" id="rememberKey"> <span data-i18n="remember">Remember on this device</span></label>
+    <div id="modelPick" hidden class="row">
+      <div style="flex:1 1 200px"><label class="lbl" for="imgModel" data-i18n="imgModel">Image model</label><select id="imgModel"></select></div>
+      <div style="flex:1 1 200px"><label class="lbl" for="judgeModel" data-i18n="judgeModel">Judge model</label><select id="judgeModel"></select></div>
+    </div>
+    <div id="keyErr" class="err" hidden></div>
+    <button class="btn block" id="saveKey" type="button" data-i18n="connect">Connect</button>
+  </section>
+
+  <!-- SELFIE -->
+  <section class="card" id="selfieCard">
+    <div class="step"><span class="n">1</span><h2 data-i18n="s1">Add a selfie</h2></div>
+    <label class="drop" id="drop" for="file">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h2.5l1.5-2h8l1.5 2H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <strong data-i18n="drop">Take or choose a photo</strong>
+      <span class="muted small" data-i18n="dropHint">Face the camera, good light, just you in the shot.</span>
+    </label>
+    <input id="file" type="file" accept="image/*" hidden>
+    <div class="selfie-prev" id="selfiePrev" hidden>
+      <img id="selfieImg" alt="Your selfie">
+      <div style="display:grid;gap:6px">
+        <strong data-i18n="looksGood">Looks good</strong>
+        <button class="ghost" type="button" id="changeSelfie" data-i18n="change">Change photo</button>
+      </div>
+    </div>
+    <div class="privacy">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span data-i18n="privacy">Your photo is never stored. It's sent only to Google's Gemini API to make your stickers, on a paid tier where prompts aren't used to improve Google's products.</span>
+    </div>
+  </section>
+
+  <!-- STYLE -->
+  <section class="card" id="styleCard">
+    <div class="step"><span class="n">2</span><h2 data-i18n="s2">Pick a style</h2></div>
+    <div class="styles" role="radiogroup" aria-label="Style">
+      <label class="style-opt"><input type="radio" name="style" value="real" checked><div class="sw sw-real">Aa</div><strong data-i18n="stReal">Real you</strong><span data-i18n="stRealD">Photo cutout, meme energy</span></label>
+      <label class="style-opt"><input type="radio" name="style" value="3d"><div class="sw sw-3d">3D</div><strong data-i18n="st3d">3D animated</strong><span data-i18n="st3dD">Movie-style character</span></label>
+      <label class="style-opt"><input type="radio" name="style" value="vinyl"><div class="sw sw-vinyl">◉</div><strong data-i18n="stVinyl">Vinyl toy</strong><span data-i18n="stVinylD">Collectible figure</span></label>
+    </div>
+    <div id="genErr" class="err" hidden></div>
+    <button class="btn block" id="makeBtn" type="button" data-i18n="make">Make my 8 stickers</button>
+  </section>
+
+  <!-- PACK -->
+  <section class="card" id="packCard" hidden>
+    <div class="row" style="justify-content:space-between">
+      <div class="step"><span class="n">3</span><h2 data-i18n="s3">Your pack</h2></div>
+      <span class="timer" id="timer"></span>
+    </div>
+    <div class="pack" id="pack"></div>
+    <p class="muted small" data-i18n="rateHint">Tap 👍 or 👎 on each sticker: does it look like you?</p>
+    <div class="row">
+      <button class="btn" style="flex:1" id="saveAll" type="button" disabled data-i18n="saveAll">Save all stickers</button>
+      <button class="btn secondary" id="again" type="button" data-i18n="again">Try another style</button>
+    </div>
+    <div>
+      <strong style="font-family:var(--f-display)" data-i18n="waTitle">Add them to WhatsApp</strong>
+      <ol class="guide">
+        <li data-i18n="wa1">Save the stickers to your photos.</li>
+        <li data-i18n="wa2">In any WhatsApp chat, open the sticker tray and tap “Create”.</li>
+        <li data-i18n="wa3">Pick a sticker from your photos and send it.</li>
+      </ol>
+    </div>
+    <div class="fake">
+      <strong data-i18n="fakeTitle">Want 12 more expressions?</strong>
+      <span class="muted small" data-i18n="fakeD">Birthday, “on my way”, mic drop, sleepy and more, in the same style.</span>
+      <button class="btn" type="button" id="fakeDoor" data-i18n="fakeBtn">Unlock 12 more · €1.99</button>
+    </div>
+  </section>
+
+  <!-- LAB -->
+  <details class="lab" id="lab">
+    <summary data-i18n="lab">Lab: quality &amp; cost</summary>
+    <div class="lab-body">
+      <p class="muted small" data-i18n="labHelp">Evaluation data for this prototype. A vision model checks each sticker against your selfie.</p>
+      <div class="stats" id="stats"></div>
+      <div class="row">
+        <button class="btn secondary" type="button" id="judgeBtn" disabled data-i18n="judge">Score this pack</button>
+        <button class="ghost" type="button" id="exportBtn" data-i18n="export">Export runs (JSON)</button>
+      </div>
+      <div class="tbl-wrap" id="scoreTbl"></div>
+      <div>
+        <label class="lbl" for="price" data-i18n="price">Price per image (USD)</label>
+        <input id="price" type="number" step="0.001" min="0" value="0.034" style="max-width:160px">
+      </div>
+      <div>
+        <strong style="font-family:var(--f-display)" data-i18n="runs">Runs on this device</strong>
+        <div class="tbl-wrap" id="runsTbl"></div>
+      </div>
+    </div>
+  </details>
+
+  <footer>Selfie Sticker Studio · a 0→1 prototype by <a href="https://www.linkedin.com/in/busedoner/" target="_blank" rel="noopener">Buse Doner</a></footer>
+</div>
+
+<div class="modal" id="fakeModal" hidden>
+  <div class="card">
+    <strong style="font:600 22px var(--f-display)" data-i18n="soonT">Coming soon</strong>
+    <p class="muted" style="margin:0" data-i18n="soonD">This is a prototype, so nothing was charged. Your interest was counted, thank you!</p>
+    <button class="btn block" type="button" id="closeModal" data-i18n="ok">Got it</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* ---------- config ---------- */
+const API = "https://generativelanguage.googleapis.com/v1beta";
+const EXPRESSIONS = [
+  {id:"laugh",   en:"Laughing", tr:"Kahkaha",       p:"laughing hard, eyes squeezed shut, mouth wide open, head tilted back"},
+  {id:"facepalm",en:"Facepalm", tr:"Facepalm",      p:"facepalm: one hand covering the forehead, eyes closed, exasperated"},
+  {id:"shock",   en:"Shocked",  tr:"Şok",           p:"shocked: eyes very wide, mouth open in an O shape, eyebrows raised high"},
+  {id:"cry",     en:"Crying",   tr:"Ağlama",        p:"dramatic crying: exaggerated tears streaming, wobbly mouth, comedic"},
+  {id:"love",    en:"In love",  tr:"Kalp gözler",   p:"in love: dreamy smile, a few small red hearts floating around the head"},
+  {id:"eyeroll", en:"Eye roll", tr:"Göz devirme",   p:"rolling the eyes upward with an unimpressed smirk"},
+  {id:"thumbs",  en:"Thumbs up",tr:"Süper",         p:"confident grin with one thumbs-up hand raised next to the face"},
+  {id:"sus",     en:"Suspicious",tr:"Şüpheli",      p:"suspicious side-eye, one eyebrow raised, lips pressed together"}
+];
+const STYLES = {
+  real:  "a photorealistic photo of the same real person, natural skin texture and lighting, like a high-quality phone photo cutout. Exaggerate the facial expression like a meme reaction, but keep it the same real person",
+  "3d":  "a 3D animated feature-film character render: soft global illumination, smooth stylized skin, slightly larger expressive eyes, while clearly remaining the same person",
+  vinyl: "a collectible vinyl toy figure: glossy plastic material, simplified sculpted features, oversized head on a small body, while keeping the person's hairstyle, hair colour, skin tone, glasses and facial hair so they are clearly recognizable"
+};
+const CONCURRENCY = 3;
+
+/* ---------- i18n ---------- */
+const I18N = {
+  tr:{keyBtn:"API anahtarı",hero:"Tek selfie. Sana gerçekten benzeyen <em>8 sticker</em>.",lede:"Avatar kadar ifadeli, fotoğrafın kadar gerçek. Grup sohbeti için.",
+    keyTitle:"Gemini'yi bağla",keyHelp:"Bu prototip tarayıcında, senin Gemini API anahtarınla çalışır. Anahtar bu cihazda kalır ve sadece Google'a gönderilir.",
+    keyLabel:"Gemini API anahtarı",remember:"Bu cihazda hatırla",imgModel:"Görsel modeli",judgeModel:"Puanlama modeli",connect:"Bağlan",
+    s1:"Bir selfie ekle",drop:"Fotoğraf çek ya da seç",dropHint:"Kameraya bak, iyi ışık, karede sadece sen ol.",looksGood:"Harika görünüyor",change:"Fotoğrafı değiştir",
+    privacy:"Fotoğrafın saklanmaz. Sadece sticker'larını üretmek için Google'ın Gemini API'sine gönderilir; ücretli katmanda istemler Google ürünlerini geliştirmek için kullanılmaz.",
+    s2:"Bir stil seç",stReal:"Gerçek sen",stRealD:"Fotoğraf kesim, meme enerjisi",st3d:"3D animasyon",st3dD:"Film karakteri",stVinyl:"Vinyl oyuncak",stVinylD:"Koleksiyon figürü",
+    make:"8 sticker'ımı yap",s3:"Paketin",rateHint:"Her sticker'da 👍 ya da 👎: sana benziyor mu?",saveAll:"Hepsini kaydet",again:"Başka stil dene",
+    waTitle:"WhatsApp'a ekle",wa1:"Sticker'ları fotoğraflarına kaydet.",wa2:"Herhangi bir sohbette sticker panelini aç ve “Oluştur”a dokun.",wa3:"Fotoğraflarından sticker'ı seç ve gönder.",
+    fakeTitle:"12 ifade daha ister misin?",fakeD:"Doğum günü, “yoldayım”, mic drop, uykulu ve daha fazlası, aynı stilde.",fakeBtn:"12 ifade daha aç · 1,99 €",
+    lab:"Lab: kalite ve maliyet",labHelp:"Bu prototipin değerlendirme verileri. Bir görsel model her sticker'ı selfie'nle karşılaştırır.",judge:"Bu paketi puanla",export:"Çalıştırmaları indir (JSON)",
+    price:"Görsel başı fiyat (USD)",runs:"Bu cihazdaki çalıştırmalar",soonT:"Çok yakında",soonD:"Bu bir prototip, hiçbir ücret alınmadı. İlgin kaydedildi, teşekkürler!",ok:"Tamam",
+    needKey:"Önce Gemini API anahtarını bağla.",needSelfie:"Önce bir selfie ekle.",saved:"Kaydedildi",noImage:"Model görsel döndürmedi",retry:"Tekrar dene",
+    firstIn:"İlk sticker: {s} sn",doneIn:"8 sticker: {s} sn",scoring:"Puanlanıyor…",connected:"Bağlandı",keyBad:"Anahtar çalışmadı: {m}",noImgModels:"Bu anahtarla görsel üreten model bulunamadı."},
+  en:{}
+};
+let LANG = (localStorage_get("sss_lang") || (navigator.language||"en").slice(0,2)) === "tr" ? "tr" : "en";
+const EN_DEFAULTS = {needKey:"Connect your Gemini API key first.",needSelfie:"Add a selfie first.",saved:"Saved",noImage:"The model returned no image",retry:"Retry",
+  firstIn:"First sticker: {s}s",doneIn:"All 8: {s}s",scoring:"Scoring…",connected:"Connected",keyBad:"That key didn't work: {m}",noImgModels:"No image-generation model is available for this key."};
+function t(k, vars){ let s = (LANG==="tr" && I18N.tr[k]) || EN_DEFAULTS[k] || I18N.en[k] || k; if(vars) for(const v in vars) s=s.replace("{"+v+"}",vars[v]); return s; }
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ const k=el.dataset.i18n; if(!el.dataset.en) el.dataset.en=el.textContent; el.textContent = LANG==="tr" && I18N.tr[k] ? I18N.tr[k] : el.dataset.en; });
+  document.querySelectorAll("[data-i18n-html]").forEach(el=>{ const k=el.dataset.i18nHtml; if(!el.dataset.en) el.dataset.en=el.innerHTML; el.innerHTML = LANG==="tr" && I18N.tr[k] ? I18N.tr[k] : el.dataset.en; });
+  $("langBtn").textContent = LANG==="tr" ? "EN" : "TR";
+  renderPackLabels();
+}
+
+/* ---------- utils ---------- */
+function $(id){ return document.getElementById(id); }
+function localStorage_get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function localStorage_set(k,v){ try{ v==null ? localStorage.removeItem(k) : localStorage.setItem(k,v); }catch(e){} }
+function toast(m){ const el=$("toast"); el.textContent=m; el.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove("on"),2200); }
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+/* ---------- state ---------- */
+const S = {
+  key: localStorage_get("sss_key") || "",
+  imgModel: localStorage_get("sss_img_model") || "",
+  judgeModel: localStorage_get("sss_judge_model") || "",
+  selfie: null,           // {b64, mime, url}
+  run: null,              // current run
+  runs: JSON.parse(localStorage_get("sss_runs") || "[]"),
+  events: []
+};
+function log(name, props={}){ const e={t:new Date().toISOString(), name, ...props}; S.events.push(e); if(S.run) S.run.events.push(e); }
+
+/* ---------- Gemini ---------- */
+async function gemini(model, body, attempt=0){
+  const res = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":S.key}, body:JSON.stringify(body)
+  });
+  if((res.status===429 || res.status===503) && attempt<3){ await sleep(1500*Math.pow(2,attempt)+Math.random()*500); return gemini(model, body, attempt+1); }
+  const json = await res.json().catch(()=>({}));
+  if(!res.ok){ const m = json?.error?.message || `HTTP ${res.status}`; const err = new Error(m); err.status=res.status; throw err; }
+  return json;
+}
+function findImage(obj){
+  if(!obj || typeof obj!=="object") return null;
+  const inl = obj.inlineData || obj.inline_data;
+  if(inl && inl.data && /^image\//.test(inl.mimeType||inl.mime_type||"")) return {data:inl.data, mime:inl.mimeType||inl.mime_type};
+  if(obj.type==="image" && obj.data) return {data:obj.data, mime:obj.mime_type||obj.mimeType||"image/png"};
+  for(const k in obj){ const r = findImage(obj[k]); if(r) return r; }
+  return null;
+}
+function findText(json){ try{ return json.candidates[0].content.parts.filter(p=>p.text).map(p=>p.text).join(""); }catch(e){ return ""; } }
+async function listModels(){
+  let out=[], token="";
+  do{
+    const res = await fetch(`${API}/models?pageSize=200${token?`&pageToken=${token}`:""}`, {headers:{"x-goog-api-key":S.key}});
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
+    out = out.concat(json.models||[]); token = json.nextPageToken||"";
+  }while(token);
+  return out.filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace(/^models\//,""));
+}
+function pickDefault(list, prefs){ for(const p of prefs){ const f=list.find(m=>p.test(m)); if(f) return f; } return list[0]||""; }
+
+/* ---------- key screen ---------- */
+function showKeyCard(force){ $("keyCard").hidden = !(force || !S.key || !S.imgModel); if(!$("keyCard").hidden){ $("apiKey").value=S.key; $("rememberKey").checked=!!localStorage_get("sss_key"); } }
+$("keyBtn").onclick = ()=>{ $("keyCard").hidden = !$("keyCard").hidden; if(!$("keyCard").hidden){ $("apiKey").value=S.key; $("keyCard").scrollIntoView({behavior:"smooth"}); } };
+$("saveKey").onclick = async ()=>{
+  const key = $("apiKey").value.trim(); $("keyErr").hidden=true;
+  if(!key){ return; }
+  // second click with models visible = confirm selection
+  if(!$("modelPick").hidden && key===S.key){
+    S.imgModel=$("imgModel").value; S.judgeModel=$("judgeModel").value;
+    localStorage_set("sss_img_model",S.imgModel); localStorage_set("sss_judge_model",S.judgeModel);
+    $("keyCard").hidden=true; toast(t("connected")); log("key_connected",{imgModel:S.imgModel,judgeModel:S.judgeModel}); renderStats(); return;
+  }
+  S.key=key; $("saveKey").disabled=true;
+  try{
+    const models = await listModels();
+    const img = models.filter(m=>/image/.test(m) && !/imagen|embedding|tts|live|audio|veo/.test(m));
+    const txt = models.filter(m=>/^gemini/.test(m) && !/image|tts|live|audio|embedding|veo|computer/.test(m));
+    if(!img.length) throw new Error(t("noImgModels"));
+    const imgDef = S.imgModel && img.includes(S.imgModel) ? S.imgModel : pickDefault(img,[/flash-lite-image/,/nano-banana-2\.1/,/flash-image/,/image/]);
+    const jDef = S.judgeModel && txt.includes(S.judgeModel) ? S.judgeModel : pickDefault(txt,[/flash-lite$/,/flash-lite/,/flash$/,/flash/]);
+    $("imgModel").innerHTML = img.map(m=>`<option ${m===imgDef?"selected":""}>${m}</option>`).join("");
+    $("judgeModel").innerHTML = txt.map(m=>`<option ${m===jDef?"selected":""}>${m}</option>`).join("");
+    $("modelPick").hidden=false;
+    if($("rememberKey").checked) localStorage_set("sss_key",key); else localStorage_set("sss_key",null);
+    $("saveKey").textContent = LANG==="tr" ? "Modelleri onayla" : "Use these models";
+  }catch(e){ $("keyErr").textContent=t("keyBad",{m:e.message}); $("keyErr").hidden=false; S.key=""; }
+  finally{ $("saveKey").disabled=false; }
+};
+
+/* ---------- selfie ---------- */
+$("drop").addEventListener("dragover",e=>{e.preventDefault();});
+$("drop").addEventListener("drop",e=>{e.preventDefault(); if(e.dataTransfer.files[0]) loadSelfie(e.dataTransfer.files[0]);});
+$("file").onchange = e=>{ if(e.target.files[0]) loadSelfie(e.target.files[0]); e.target.value=""; };
+$("changeSelfie").onclick = ()=>$("file").click();
+async function loadSelfie(file){
+  const img = await fileToImage(file);
+  const max = 1024, sc = Math.min(1, max/Math.max(img.width,img.height));
+  const c = document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  const url = c.toDataURL("image/jpeg",0.9);
+  S.selfie = {b64:url.split(",")[1], mime:"image/jpeg", url};
+  $("selfieImg").src=url; $("selfiePrev").hidden=false; $("drop").hidden=true;
+  log("selfie_added",{w:c.width,h:c.height});
+}
+function fileToImage(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>{URL.revokeObjectURL(u);res(i);}; i.onerror=rej; i.src=u; }); }
+
+/* ---------- prompt ---------- */
+function stickerPrompt(style, ex){
+  return [
+    "You are making one chat sticker from the reference photo of a person.",
+    "IDENTITY: keep the exact same person: face shape, eyes, eyebrows, nose, mouth, skin tone, hairstyle and hair colour, facial hair, glasses and any distinctive marks. The person must be instantly recognisable to their friends.",
+    `EXPRESSION: ${ex.p}.`,
+    `STYLE: ${STYLES[style]}.`,
+    "FRAMING: head and top of the shoulders only, centred, the whole head visible with a little margin on every side. One person only. No text, no letters, no logos, no frame, no border, no watermark.",
+    "BACKGROUND: a perfectly flat, uniform, pure green chroma-key background (#00FF00) filling the entire image edge to edge. No shadows on the background, no gradient, no floor, no scenery. Do not use green anywhere on the person."
+  ].join("\n");
+}
+
+/* ---------- background removal + sticker outline ---------- */
+async function toSticker(b64, mime){
+  const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=`data:${mime};base64,${b64}`; });
+  const W=img.width, H=img.height;
+  const c=document.createElement("canvas"); c.width=W; c.height=H; const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(img,0,0); const id=ctx.getImageData(0,0,W,H), d=id.data;
+  // estimate key colour from the border
+  const border=[]; const step=Math.max(1,Math.floor((W+H)/400));
+  for(let x=0;x<W;x+=step){ border.push(px(x,0)); border.push(px(x,H-1)); }
+  for(let y=0;y<H;y+=step){ border.push(px(0,y)); border.push(px(W-1,y)); }
+  function px(x,y){ const i=(y*W+x)*4; return [d[i],d[i+1],d[i+2]]; }
+  const med = k => border.map(p=>p[k]).sort((a,b)=>a-b)[border.length>>1];
+  const key=[med(0),med(1),med(2)];
+  const dist=(i)=>{ const r=d[i]-key[0], g=d[i+1]-key[1], b=d[i+2]-key[2]; return Math.sqrt(r*r+g*g+b*b); };
+  const nearKey = border.filter(p=>Math.hypot(p[0]-key[0],p[1]-key[1],p[2]-key[2])<70).length/border.length;
+  let bgOk = nearKey>0.75;
+  const alpha=new Uint8Array(W*H).fill(255);
+  if(bgOk){
+    const T=95, seen=new Uint8Array(W*H), q=new Int32Array(W*H); let qh=0, qt=0;
+    const push=(x,y)=>{ const p=y*W+x; if(seen[p]) return; seen[p]=1; if(dist(p*4)<T){ alpha[p]=0; q[qt++]=p; } };
+    for(let x=0;x<W;x++){ push(x,0); push(x,H-1); } for(let y=0;y<H;y++){ push(0,y); push(W-1,y); }
+    while(qh<qt){ const p=q[qh++], x=p%W, y=(p/W)|0; if(x>0)push(x-1,y); if(x<W-1)push(x+1,y); if(y>0)push(x,y-1); if(y<H-1)push(x,y+1); }
+    // soften edge + despill
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+      const p=y*W+x; if(!alpha[p]) continue;
+      if(!alpha[p-1]||!alpha[p+1]||!alpha[p-W]||!alpha[p+W]){
+        const i=p*4, dd=dist(i); alpha[p]=Math.max(0,Math.min(255,Math.round((dd-40)/(T-40)*255)));
+        const mx=Math.max(d[i],d[i+2]); if(d[i+1]>mx) d[i+1]=mx;
+      }
+    }
+    const removed = alpha.reduce((a,v)=>a+(v===0),0)/(W*H);
+    if(removed<0.15 || removed>0.92) bgOk=false;
+  }
+  if(!bgOk) alpha.fill(255);
+  for(let p=0;p<W*H;p++) d[p*4+3]=alpha[p];
+  ctx.putImageData(id,0,0);
+  // bbox
+  let x0=W,y0=H,x1=0,y1=0; for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(alpha[y*W+x]>20){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<=x0){ x0=0;y0=0;x1=W-1;y1=H-1; }
+  // compose 512 with white outline
+  const S2=512, pad=30, bw=x1-x0+1, bh=y1-y0+1, sc=Math.min((S2-pad*2)/bw,(S2-pad*2)/bh);
+  const dw=bw*sc, dh=bh*sc, dx=(S2-dw)/2, dy=(S2-dh)/2;
+  const out=document.createElement("canvas"); out.width=S2; out.height=S2; const o=out.getContext("2d");
+  if(bgOk){
+    const sil=document.createElement("canvas"); sil.width=S2; sil.height=S2; const s=sil.getContext("2d");
+    s.drawImage(c,x0,y0,bw,bh,dx,dy,dw,dh); s.globalCompositeOperation="source-in"; s.fillStyle="#fff"; s.fillRect(0,0,S2,S2);
+    const r=9; for(let a=0;a<360;a+=20){ o.drawImage(sil, Math.cos(a*Math.PI/180)*r, Math.sin(a*Math.PI/180)*r); }
+    o.drawImage(sil,0,0);
+    o.drawImage(c,x0,y0,bw,bh,dx,dy,dw,dh);
+  }else{
+    o.save(); roundRect(o,pad,pad,S2-pad*2,S2-pad*2,48); o.clip(); o.drawImage(c,pad,pad,S2-pad*2,S2-pad*2); o.restore();
+    o.lineWidth=10; o.strokeStyle="#fff"; roundRect(o,pad,pad,S2-pad*2,S2-pad*2,48); o.stroke();
+  }
+  return {url: out.toDataURL("image/png"), bgRemoved: bgOk};
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+
+/* ---------- generation ---------- */
+$("makeBtn").onclick = startRun;
+$("again").onclick = ()=>{ $("styleCard").scrollIntoView({behavior:"smooth"}); };
+function currentStyle(){ return document.querySelector('input[name=style]:checked').value; }
+async function startRun(){
+  $("genErr").hidden=true;
+  if(!S.key || !S.imgModel){ showKeyCard(true); $("genErr").textContent=t("needKey"); $("genErr").hidden=false; return; }
+  if(!S.selfie){ $("genErr").textContent=t("needSelfie"); $("genErr").hidden=false; return; }
+  const style=currentStyle();
+  S.run = {id:uid(), started:Date.now(), style, imgModel:S.imgModel, judgeModel:S.judgeModel, price:+$("price").value||0,
+    images:0, firstMs:null, doneMs:null, items:EXPRESSIONS.map(ex=>({ex:ex.id, state:"loading", url:null, vote:null, bgRemoved:null, score:null, ms:null, error:null, tries:0})), judgeCost:0, events:[], fakeDoor:0, saved:false};
+  log("run_started",{style, imgModel:S.imgModel});
+  $("packCard").hidden=false; $("makeBtn").disabled=true; $("saveAll").disabled=true; $("judgeBtn").disabled=true;
+  renderPack(); $("packCard").scrollIntoView({behavior:"smooth",block:"start"});
+  const tick=setInterval(()=>{ if(!S.run) return; const s=((Date.now()-S.run.started)/1000).toFixed(0); $("timer").textContent = S.run.firstMs ? t("firstIn",{s:(S.run.firstMs/1000).toFixed(1)}) : s+"s"; },250);
+  const queue=[...S.run.items.keys()]; const run=S.run;
+  await Promise.all(Array.from({length:CONCURRENCY}, async ()=>{ while(queue.length){ const i=queue.shift(); await genOne(run,i); } }));
+  clearInterval(tick);
+  if(S.run!==run) return;
+  run.doneMs = Date.now()-run.started;
+  $("timer").textContent = (run.firstMs?t("firstIn",{s:(run.firstMs/1000).toFixed(1)})+" · ":"") + t("doneIn",{s:(run.doneMs/1000).toFixed(1)});
+  $("makeBtn").disabled=false; $("saveAll").disabled = !run.items.some(it=>it.url); $("judgeBtn").disabled = !run.items.some(it=>it.url);
+  log("run_finished",{ms:run.doneMs, ok:run.items.filter(i=>i.url).length});
+  saveRun(run); renderStats();
+}
+async function genOne(run, i){
+  const it=run.items[i], ex=EXPRESSIONS[i]; it.state="loading"; it.error=null; it.tries++; renderTile(i);
+  const t0=Date.now();
+  const body={ contents:[{role:"user",parts:[{inline_data:{mime_type:S.selfie.mime,data:S.selfie.b64}},{text:stickerPrompt(run.style,ex)}]}],
+    generationConfig:{responseModalities:["TEXT","IMAGE"], imageConfig:{aspectRatio:"1:1"}} };
+  try{
+    const json = await gemini(run.imgModel, body);
+    run.images++;
+    const im = findImage(json);
+    if(!im){ const fr=json?.candidates?.[0]?.finishReason || json?.promptFeedback?.blockReason || ""; throw new Error(t("noImage")+(fr?` (${fr})`:"")+(findText(json)?`: ${findText(json).slice(0,120)}`:"")); }
+    const st = await toSticker(im.data, im.mime||"image/png");
+    if(S.run!==run) return;
+    it.url=st.url; it.bgRemoved=st.bgRemoved; it.state="done"; it.ms=Date.now()-t0;
+    if(!run.firstMs){ run.firstMs=Date.now()-run.started; log("first_sticker",{ms:run.firstMs}); }
+    log("sticker_ready",{ex:ex.id, ms:it.ms, bgRemoved:st.bgRemoved});
+  }catch(e){ it.state="failed"; it.error=e.message; log("sticker_failed",{ex:ex.id, error:e.message}); }
+  if(S.run===run){ renderTile(i); renderStats(); }
+}
+
+/* ---------- pack UI ---------- */
+function exLabel(i){ return LANG==="tr"?EXPRESSIONS[i].tr:EXPRESSIONS[i].en; }
+function renderPack(){ $("pack").innerHTML = EXPRESSIONS.map((_,i)=>`<div class="tile loading" id="tile${i}"></div>`).join(""); S.run.items.forEach((_,i)=>renderTile(i)); }
+function renderPackLabels(){ if(S.run) S.run.items.forEach((_,i)=>renderTile(i)); }
+function renderTile(i){
+  const el=$("tile"+i); if(!el||!S.run) return; const it=S.run.items[i];
+  el.className="tile "+(it.state==="loading"?"loading":it.state==="failed"?"failed":"");
+  if(it.state==="loading"){ el.innerHTML=`<span class="lab">${exLabel(i)}</span>`; return; }
+  if(it.state==="failed"){ el.innerHTML=`<span class="lab">${exLabel(i)}</span><div class="ferr"><span>${escapeHtml(it.error||"")}</span><button class="btn secondary" type="button" data-retry="${i}">${t("retry")}</button></div>`; el.querySelector("[data-retry]").onclick=()=>genOne(S.run,i); return; }
+  const fresh = !el.querySelector("img");
+  el.innerHTML = `<img alt="${exLabel(i)} sticker" src="${it.url}" class="${fresh?"pop":""}"><span class="lab">${exLabel(i)}</span>${it.score?`<span class="score">ID ${it.score.identity}/5</span>`:""}
+    <div class="acts"><button type="button" aria-label="Looks like me" aria-pressed="${it.vote==="up"}" data-v="up">👍</button><button type="button" aria-label="Doesn't look like me" aria-pressed="${it.vote==="down"}" data-v="down">👎</button><button type="button" aria-label="Regenerate" data-r>↻</button></div>`;
+  el.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{ it.vote = it.vote===b.dataset.v?null:b.dataset.v; log("vote",{ex:EXPRESSIONS[i].id, vote:it.vote}); saveRun(S.run); renderTile(i); renderStats(); });
+  el.querySelector("[data-r]").onclick=()=>{ log("regenerate",{ex:EXPRESSIONS[i].id}); genOne(S.run,i).then(()=>saveRun(S.run)); };
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ---------- save / share ---------- */
+$("saveAll").onclick = async ()=>{
+  const run=S.run; if(!run) return; const done=run.items.map((it,i)=>({it,i})).filter(x=>x.it.url);
+  const files = await Promise.all(done.map(async ({it,i})=>{ const b=await (await fetch(it.url)).blob(); return new File([b],`sticker-${String(i+1).padStart(2,"0")}-${EXPRESSIONS[i].id}.png`,{type:"image/png"}); }));
+  run.saved=true; saveRun(run);
+  if(navigator.canShare && navigator.canShare({files})){
+    try{ await navigator.share({files}); log("saved",{method:"share",n:files.length}); toast(t("saved")); return; }catch(e){ if(e.name==="AbortError") return; }
+  }
+  const zip=new JSZip(); files.forEach(f=>zip.file(f.name,f)); const blob=await zip.generateAsync({type:"blob"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`my-stickers-${run.style}.zip`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  log("saved",{method:"zip",n:files.length}); toast(t("saved"));
+};
+$("fakeDoor").onclick = ()=>{ if(S.run){ S.run.fakeDoor++; saveRun(S.run); } log("fake_door_click",{style:S.run?.style}); $("fakeModal").hidden=false; $("closeModal").focus(); };
+$("closeModal").onclick = ()=>{ $("fakeModal").hidden=true; };
+
+/* ---------- judge ---------- */
+$("judgeBtn").onclick = async ()=>{
+  const run=S.run; if(!run||!S.judgeModel) return; const done=run.items.map((it,i)=>({it,i})).filter(x=>x.it.url);
+  $("judgeBtn").disabled=true; $("judgeBtn").textContent=t("scoring");
+  const parts=[{text:"Image 0 is a reference selfie of a real person. The following images are chat stickers that are supposed to show the same person with specific expressions. Score each sticker strictly."},
+    {inline_data:{mime_type:S.selfie.mime,data:S.selfie.b64}}];
+  done.forEach(({it,i},k)=>{ parts.push({text:`Sticker index ${i}, intended expression: ${EXPRESSIONS[i].p}`}); parts.push({inline_data:{mime_type:"image/png",data:it.url.split(",")[1]}}); });
+  parts.push({text:"For each sticker return: identity (1-5, would friends instantly recognise this as the same person? 5 = unmistakably the same person, 1 = a different person), expression (1-5, how clearly the intended expression reads), quality (1-5, artefacts, extra fingers, cut-off head, leftover background), and a one-sentence note naming the biggest problem."});
+  const body={contents:[{role:"user",parts}], generationConfig:{responseMimeType:"application/json", responseSchema:{type:"ARRAY",items:{type:"OBJECT",properties:{index:{type:"INTEGER"},identity:{type:"INTEGER"},expression:{type:"INTEGER"},quality:{type:"INTEGER"},note:{type:"STRING"}},required:["index","identity","expression","quality","note"]}}}};
+  try{
+    const json=await gemini(S.judgeModel, body);
+    const arr=JSON.parse(findText(json)||"[]");
+    arr.forEach(s=>{ if(run.items[s.index]) run.items[s.index].score={identity:s.identity,expression:s.expression,quality:s.quality,note:s.note}; });
+    const u=json.usageMetadata||{}; run.judgeTokens={in:u.promptTokenCount||0,out:u.candidatesTokenCount||0};
+    log("judged",{n:arr.length}); saveRun(run); run.items.forEach((_,i)=>renderTile(i)); renderStats();
+  }catch(e){ toast(e.message); log("judge_failed",{error:e.message}); }
+  finally{ $("judgeBtn").disabled=false; $("judgeBtn").textContent=t("judge"); }
+};
+
+/* ---------- lab ---------- */
+function avg(a){ const v=a.filter(x=>x!=null); return v.length? v.reduce((s,x)=>s+x,0)/v.length : null; }
+function summarize(run){
+  const sc=run.items.map(i=>i.score).filter(Boolean);
+  const votes=run.items.map(i=>i.vote).filter(Boolean);
+  return { id:run.id, when:new Date(run.started).toISOString(), style:run.style, imgModel:run.imgModel,
+    ok:run.items.filter(i=>i.url).length, images:run.images, firstS: run.firstMs? +(run.firstMs/1000).toFixed(1):null, doneS: run.doneMs? +(run.doneMs/1000).toFixed(1):null,
+    cost:+(run.images*run.price).toFixed(3), identity: avg(sc.map(s=>s.identity)), expression: avg(sc.map(s=>s.expression)), quality: avg(sc.map(s=>s.quality)),
+    likeRate: votes.length? votes.filter(v=>v==="up").length/votes.length : null, bgRemovedRate: avg(run.items.filter(i=>i.url).map(i=>i.bgRemoved?1:0)),
+    saved:run.saved, fakeDoor:run.fakeDoor, items:run.items.map((i,k)=>({ex:EXPRESSIONS[k].id, ok:!!i.url, ms:i.ms, tries:i.tries, vote:i.vote, bgRemoved:i.bgRemoved, score:i.score, error:i.error})), events:run.events };
+}
+function saveRun(run){ const s=summarize(run); const k=S.runs.findIndex(r=>r.id===run.id); if(k>=0) S.runs[k]=s; else S.runs.unshift(s); S.runs=S.runs.slice(0,40); localStorage_set("sss_runs",JSON.stringify(S.runs)); renderRuns(); }
+const f1 = v => v==null ? "–" : (Math.round(v*10)/10).toString();
+function renderStats(){
+  const run=S.run; const s = run? summarize(run) : null;
+  const cards=[[LANG==="tr"?"İlk sticker":"First sticker", s?.firstS!=null? s.firstS+"s":"–"],[LANG==="tr"?"Pakette":"In pack", s? `${s.ok}/8`:"–"],
+    [LANG==="tr"?"Kimlik (AI)":"Identity (AI)", s? f1(s.identity)+" /5":"–"],[LANG==="tr"?"👍 oranı":"👍 rate", s?.likeRate!=null? Math.round(s.likeRate*100)+"%":"–"],
+    [LANG==="tr"?"Arka plan temizlendi":"Background removed", s?.bgRemovedRate!=null? Math.round(s.bgRemovedRate*100)+"%":"–"],[LANG==="tr"?"Maliyet":"Cost", s? "$"+s.cost.toFixed(3):"–"]];
+  $("stats").innerHTML = cards.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  if(run && run.items.some(i=>i.score)){
+    $("scoreTbl").innerHTML = `<table><thead><tr><th>${LANG==="tr"?"İfade":"Expression"}</th><th>ID</th><th>Expr</th><th>Qual</th><th>${LANG==="tr"?"Not":"Note"}</th></tr></thead><tbody>${run.items.map((it,i)=>it.score?`<tr><td>${exLabel(i)}</td><td>${it.score.identity}</td><td>${it.score.expression}</td><td>${it.score.quality}</td><td class="note-cell">${escapeHtml(it.score.note)}</td></tr>`:"").join("")}</tbody></table>`;
+  } else $("scoreTbl").innerHTML="";
+}
+function renderRuns(){
+  if(!S.runs.length){ $("runsTbl").innerHTML=`<p class="muted small">${LANG==="tr"?"Henüz çalıştırma yok.":"No runs yet."}</p>`; return; }
+  $("runsTbl").innerHTML = `<table><thead><tr><th>Style</th><th>Model</th><th>OK</th><th>1st</th><th>All</th><th>ID</th><th>👍</th><th>$</th></tr></thead><tbody>${S.runs.map(r=>`<tr><td>${r.style}</td><td>${escapeHtml(r.imgModel)}</td><td>${r.ok}/8</td><td>${r.firstS??"–"}s</td><td>${r.doneS??"–"}s</td><td>${f1(r.identity)}</td><td>${r.likeRate!=null?Math.round(r.likeRate*100)+"%":"–"}</td><td>${r.cost.toFixed(2)}</td></tr>`).join("")}</tbody></table>`;
+}
+$("exportBtn").onclick = ()=>{
+  const blob=new Blob([JSON.stringify({exported:new Date().toISOString(), runs:S.runs},null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="sticker-studio-runs.json"; document.body.appendChild(a); a.click(); a.remove();
+};
+$("price").onchange = ()=>{ if(S.run){ S.run.price=+$("price").value||0; saveRun(S.run); renderStats(); } };
+
+/* ---------- boot ---------- */
+$("langBtn").onclick = ()=>{ LANG = LANG==="tr"?"en":"tr"; localStorage_set("sss_lang",LANG); applyLang(); renderStats(); renderRuns(); };
+applyLang(); showKeyCard(false); renderStats(); renderRuns();
+log("app_opened",{lang:LANG});
+</script>
+</body>
+</html>
